@@ -1,4 +1,5 @@
-from pyspark.ml.feature import OneHotEncoder, StandardScaler, StringIndexer
+from pyspark.ml.feature import OneHotEncoder, StringIndexer
+from pyspark.sql.functions import mean as _mean
 
 
 def load_data(spark):
@@ -7,24 +8,27 @@ def load_data(spark):
     df = df.drop(*('ArrTime', 'ActualElapsedTime', 'AirTime', 'TaxiIn', 'Diverted', 'CarrierDelay', 'WeatherDelay',
                    'NASDelay', 'SecurityDelay', 'LateAircraftDelay'))
     # Remove useless variables
-    df = df.drop(*('CancellationCode', 'TailNum'))
+    df = df.drop(*('Year', 'CancellationCode', 'DepTime', 'FlightNum', 'TailNum', 'Distance', 'Cancelled'))
 
-    print(df.count())
     # Remove canceled flights
     df = df.replace('NA', None)
     df = df.na.drop(how='any', subset=['ArrDelay'])
-    print(df.count())
 
     # Remove rows with NA values
     df = df.na.drop(how='any')
-    print(df.count())
 
     # Parse columns from string to integer or double
-    df = df.withColumn('DepTime', df['DepTime'].cast('integer'))
     df = df.withColumn('CRSElapsedTime', df['CRSElapsedTime'].cast('integer'))
     df = df.withColumn('ArrDelay', df['ArrDelay'].cast('double'))
     df = df.withColumn('DepDelay', df['DepDelay'].cast('integer'))
     df = df.withColumn('TaxiOut', df['TaxiOut'].cast('integer'))
+
+    # Mean Taxi Out
+    df_TaxiOutMean = df.groupby('Origin').agg(_mean('TaxiOut'))
+    df_TaxiOutMean = df_TaxiOutMean.withColumnRenamed('Origin', 'Origin2')
+    df = df.join(df_TaxiOutMean, df['Origin'] == df_TaxiOutMean['Origin2'], 'left')
+    df = df.withColumn('TaxiOut', df['TaxiOut'] - df['avg(TaxiOut)'])
+    df = df.drop(*('avg(TaxiOut)', 'Origin2'))
 
     # OneHotEncoder
     indexer = StringIndexer(inputCols=['UniqueCarrier', 'Origin', 'Dest'],
@@ -37,6 +41,5 @@ def load_data(spark):
     df = df.withColumnRenamed('UniqueCarrier_ohe', 'UniqueCarrier') \
         .withColumnRenamed('Origin_index_ohe', 'Origin') \
         .withColumnRenamed('Dest_index_ohe', 'Dest')
-    df.show()
 
     return df
