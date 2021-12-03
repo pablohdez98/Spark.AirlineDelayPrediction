@@ -34,12 +34,16 @@ def load_data(spark):
     indexer = StringIndexer(inputCols=['UniqueCarrier', 'Origin', 'Dest'],
                             outputCols=['UniqueCarrier_index', 'Origin_index', 'Dest_index']).fit(df)
     df = indexer.transform(df)
-    indexer = OneHotEncoder(inputCols=['UniqueCarrier_index', 'Origin_index', 'Dest_index'],
-                            outputCols=['UniqueCarrier_ohe', 'Origin_index_ohe', 'Dest_index_ohe']).fit(df)
+    indexer = OneHotEncoder(inputCols=['UniqueCarrier_index', 'Origin_index', 'Dest_index', 'Month', 'DayOfWeek'],
+                            outputCols=['UniqueCarrier_ohe', 'Origin_index_ohe', 'Dest_index_ohe', 'Month_index_ohe',
+                                        'DayOfWeek_index_ohe']).fit(df)
     df = indexer.transform(df)
-    df = df.drop(*('Dest', 'Origin', 'UniqueCarrier', 'Dest_index', 'Origin_index', 'UniqueCarrier_index'))
+    df = df.drop(
+        *('Dest', 'Origin', 'UniqueCarrier', 'Dest_index', 'Origin_index', 'UniqueCarrier_index', 'Month', 'DayOfWeek'))
     df = df.withColumnRenamed('UniqueCarrier_ohe', 'UniqueCarrier') \
         .withColumnRenamed('Origin_index_ohe', 'Origin') \
-        .withColumnRenamed('Dest_index_ohe', 'Dest')
+        .withColumnRenamed('Dest_index_ohe', 'Dest') \
+        .withColumnRenamed('Month_index_ohe', 'Month') \
+        .withColumnRenamed('DayOfWeek_index_ohe', 'DayOfWeek')
 
     return df
