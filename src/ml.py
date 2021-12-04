@@ -25,7 +25,7 @@ def linear_regression(train, test):
 
 
 def linear_regression_model(train):
-    lr = LinearRegression(maxIter=10, regParam=0.3, elasticNetParam=0.8, featuresCol='features', labelCol='label')
+    lr = LinearRegression(maxIter=10, regParam=0.3, elasticNetParam=0.8)
     model = lr.fit(train)
     print("Coefficients: %s" % str(model.coefficients))
     print("Intercept: %s" % str(model.intercept))

@@ -1,4 +1,4 @@
-from pyspark.ml.feature import OneHotEncoder, StringIndexer
+from pyspark.ml.feature import RFormula
 from pyspark.sql.functions import mean as _mean
 from pyspark.sql.functions import isnan, when, count, col
 
@@ -24,11 +24,19 @@ def load_data(spark):
     # Remove rows with NA values
     df = df.na.drop(how='any')
 
-    # Parse columns from string to integer or double
+    # Parse all columns to their type
+    df = df.withColumn('Month', df['Month'].cast('string'))
+    df = df.withColumn('DayofMonth', df['DayofMonth'].cast('string'))
+    df = df.withColumn('DayOfWeek', df['DayOfWeek'].cast('string'))
+    df = df.withColumn('CRSDepTime', df['CRSDepTime'].cast('integer'))
+    df = df.withColumn('CRSArrTime', df['CRSArrTime'].cast('integer'))
     df = df.withColumn('CRSElapsedTime', df['CRSElapsedTime'].cast('integer'))
-    df = df.withColumn('ArrDelay', df['ArrDelay'].cast('integer'))
     df = df.withColumn('DepDelay', df['DepDelay'].cast('integer'))
     df = df.withColumn('TaxiOut', df['TaxiOut'].cast('integer')) if 'TaxiOut' in df.columns else df
+    df = df.withColumn('UniqueCarrier', df['UniqueCarrier'].cast('string'))
+    df = df.withColumn('Origin', df['Origin'].cast('string'))
+    df = df.withColumn('Dest', df['Dest'].cast('string'))
+    df = df.withColumn('ArrDelay', df['ArrDelay'].cast('integer'))
 
     # Mean Taxi Out
     if 'TaxiOut' in df.columns:
@@ -38,20 +46,15 @@ def load_data(spark):
         df = df.withColumn('TaxiOut', df['TaxiOut'] - df['avg(TaxiOut)'])
         df = df.drop(*('avg(TaxiOut)', 'Origin2'))
 
-    # OneHotEncoder
-    indexer = StringIndexer(inputCols=['UniqueCarrier', 'Origin', 'Dest'],
-                            outputCols=['UniqueCarrier_index', 'Origin_index', 'Dest_index']).fit(df)
-    df = indexer.transform(df)
-    indexer = OneHotEncoder(inputCols=['UniqueCarrier_index', 'Origin_index', 'Dest_index', 'Month', 'DayOfWeek'],
-                            outputCols=['UniqueCarrier_ohe', 'Origin_index_ohe', 'Dest_index_ohe', 'Month_index_ohe',
-                                        'DayOfWeek_index_ohe']).fit(df)
-    df = indexer.transform(df)
-    df = df.drop(
-        *('Dest', 'Origin', 'UniqueCarrier', 'Dest_index', 'Origin_index', 'UniqueCarrier_index', 'Month', 'DayOfWeek'))
-    df = df.withColumnRenamed('UniqueCarrier_ohe', 'UniqueCarrier') \
-        .withColumnRenamed('Origin_index_ohe', 'Origin') \
-        .withColumnRenamed('Dest_index_ohe', 'Dest') \
-        .withColumnRenamed('Month_index_ohe', 'Month') \
-        .withColumnRenamed('DayOfWeek_index_ohe', 'DayOfWeek')
+    # Reorder df, label -> numeric features -> nominal features
+    df = df.select('ArrDelay', 'CRSDepTime', 'CRSArrTime', 'CRSElapsedTime', 'DepDelay', 'TaxiOut', 'UniqueCarrier',
+                   'Origin', 'Dest', 'Month', 'DayofMonth', 'DayOfWeek')
+
+    formula = RFormula(
+        formula="ArrDelay ~ .",
+        featuresCol="features",
+        labelCol="label").fit(df)
+    df = formula.transform(df)
+    df = df.select("features", "label")
 
     return df
