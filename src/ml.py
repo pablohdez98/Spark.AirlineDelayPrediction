@@ -2,13 +2,13 @@ from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.regression import LinearRegression
 
 
-def prepare_df(df, target):
+def prepare_df(df, label):
     columns = df.columns
-    columns.remove(target)
+    columns.remove(label)
 
-    predictors = VectorAssembler(inputCols=columns, outputCol='predictors')
+    predictors = VectorAssembler(inputCols=columns, outputCol='features')
     df = predictors.transform(df)
-    df = df.withColumnRenamed(target, 'target')
+    df = df.withColumnRenamed(label, 'label')
     df = df.drop(*columns)
     return df
 
@@ -23,14 +23,24 @@ def linear_regression(train, test):
     print("Coefficients: %s" % str(lrModel.coefficients))
     print("Intercept: %s" % str(lrModel.intercept))
 
-    trainingSummary = lrModel.summary
+
+def linear_regression_model(train):
+    lr = LinearRegression(maxIter=10, regParam=0.3, elasticNetParam=0.8, featuresCol='features', labelCol='label')
+    model = lr.fit(train)
+    print("Coefficients: %s" % str(model.coefficients))
+    print("Intercept: %s" % str(model.intercept))
+
+    trainingSummary = model.summary
     print("numIterations: %d" % trainingSummary.totalIterations)
     print("objectiveHistory: %s" % str(trainingSummary.objectiveHistory))
     trainingSummary.residuals.show()
     print("RMSE: %f" % trainingSummary.rootMeanSquaredError)
     print("r2: %f" % trainingSummary.r2)
+    return model
 
-    pred_results = lrModel.evaluate(test)
-    pred_results.predictions.sort('target', ascending=False).show()
-    print(pred_results.meanAbsoluteError)
-    print(pred_results.meanSquaredError)
+
+def evaluate_model(model, test):
+    pred_results = model.evaluate(test)
+    pred_results.predictions.sort('label', ascending=False).show()
+    print("MAE: %f" % pred_results.meanAbsoluteError)
+    print("MSE: %f" % pred_results.meanSquaredError)
