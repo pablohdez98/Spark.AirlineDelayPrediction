@@ -1,5 +1,6 @@
 from pyspark.ml.feature import OneHotEncoder, StringIndexer
 from pyspark.sql.functions import mean as _mean
+from pyspark.sql.functions import isnan, when, count, col
 
 
 def load_data(spark):
@@ -14,21 +15,32 @@ def load_data(spark):
     df = df.replace('NA', None)
     df = df.na.drop(how='any', subset=['ArrDelay'])
 
+    # Check if columns have more than 50% empty values
+    df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df.columns])
+    df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df.columns]).show()
+    df_nan = df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df.columns])
+    print(df.columns)
+    for c in df_nan.columns:
+        if (df.count() * 0.5) < df_nan.first()[c]:
+            df = df.drop(c)
+
+    print(df.columns)
     # Remove rows with NA values
     df = df.na.drop(how='any')
 
     # Parse columns from string to integer or double
     df = df.withColumn('CRSElapsedTime', df['CRSElapsedTime'].cast('integer'))
-    df = df.withColumn('ArrDelay', df['ArrDelay'].cast('double'))
+    df = df.withColumn('ArrDelay', df['ArrDelay'].cast('integer'))
     df = df.withColumn('DepDelay', df['DepDelay'].cast('integer'))
-    df = df.withColumn('TaxiOut', df['TaxiOut'].cast('integer'))
+    df = df.withColumn('TaxiOut', df['TaxiOut'].cast('integer')) if 'TaxiOut' in df.columns else df
 
     # Mean Taxi Out
-    df_TaxiOutMean = df.groupby('Origin').agg(_mean('TaxiOut'))
-    df_TaxiOutMean = df_TaxiOutMean.withColumnRenamed('Origin', 'Origin2')
-    df = df.join(df_TaxiOutMean, df['Origin'] == df_TaxiOutMean['Origin2'], 'left')
-    df = df.withColumn('TaxiOut', df['TaxiOut'] - df['avg(TaxiOut)'])
-    df = df.drop(*('avg(TaxiOut)', 'Origin2'))
+    if 'TaxiOut' in df.columns:
+        df_TaxiOutMean = df.groupby('Origin').agg(_mean('TaxiOut'))
+        df_TaxiOutMean = df_TaxiOutMean.withColumnRenamed('Origin', 'Origin2')
+        df = df.join(df_TaxiOutMean, df['Origin'] == df_TaxiOutMean['Origin2'], 'left')
+        df = df.withColumn('TaxiOut', df['TaxiOut'] - df['avg(TaxiOut)'])
+        df = df.drop(*('avg(TaxiOut)', 'Origin2'))
 
     # OneHotEncoder
     indexer = StringIndexer(inputCols=['UniqueCarrier', 'Origin', 'Dest'],
