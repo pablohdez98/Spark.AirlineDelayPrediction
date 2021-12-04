@@ -16,15 +16,11 @@ def load_data(spark):
     df = df.na.drop(how='any', subset=['ArrDelay'])
 
     # Check if columns have more than 50% empty values
-    df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df.columns])
-    df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df.columns]).show()
     df_nan = df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df.columns])
-    print(df.columns)
     for c in df_nan.columns:
         if (df.count() * 0.5) < df_nan.first()[c]:
             df = df.drop(c)
 
-    print(df.columns)
     # Remove rows with NA values
     df = df.na.drop(how='any')
 
