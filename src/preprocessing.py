@@ -38,6 +38,11 @@ def load_data(spark):
     df = df.withColumn('Dest', df['Dest'].cast('string'))
     df = df.withColumn('ArrDelay', df['ArrDelay'].cast('integer'))
 
+    df.describe().show()
+
+    # Remove rows with CRSElapsedTime (flight duration) less than 15 min and more than 15 hours
+    df = df.filter((df['CRSElapsedTime'] >= 15) & (df['CRSElapsedTime'] <= 900))
+
     # Mean Taxi Out
     if 'TaxiOut' in df.columns:
         df_TaxiOutMean = df.groupby('Origin').agg(_mean('TaxiOut'))
