@@ -22,23 +22,22 @@ def load_data(spark, file):
     df = df.drop(*('ArrTime', 'ActualElapsedTime', 'AirTime', 'TaxiIn', 'Diverted', 'CarrierDelay', 'WeatherDelay',
                    'NASDelay', 'SecurityDelay', 'LateAircraftDelay'))
     # Remove useless variables
-    df = df.drop(*('Year', 'CancellationCode', 'DepTime', 'FlightNum', 'TailNum', 'Distance', 'Cancelled'))
+    df = df.drop(*('Year', 'CancellationCode', 'DepTime', 'FlightNum', 'TailNum', 'Distance', 'Cancelled', 'CRSArrTime'))
 
     # Check if the columns remaining are in the file
     c1 = df.schema.simpleString().find('Month')
     c2 = df.schema.simpleString().find('DayofMonth')
     c3 = df.schema.simpleString().find('DayOfWeek')
     c4 = df.schema.simpleString().find('CRSDepTime')
-    c5 = df.schema.simpleString().find('CRSArrTime')
-    c6 = df.schema.simpleString().find('CRSElapsedTime')
-    c7 = df.schema.simpleString().find('DepDelay')
-    c8 = df.schema.simpleString().find('TaxiOut')
-    c9 = df.schema.simpleString().find('UniqueCarrier')
-    c10 = df.schema.simpleString().find('Origin')
-    c11 = df.schema.simpleString().find('Dest')
-    c12 = df.schema.simpleString().find('ArrDelay')
+    c5 = df.schema.simpleString().find('CRSElapsedTime')
+    c6 = df.schema.simpleString().find('DepDelay')
+    c7 = df.schema.simpleString().find('TaxiOut')
+    c8 = df.schema.simpleString().find('UniqueCarrier')
+    c9 = df.schema.simpleString().find('Origin')
+    c10 = df.schema.simpleString().find('Dest')
+    c11 = df.schema.simpleString().find('ArrDelay')
 
-    if c1 | c2 | c3 | c4 | c5 | c6 | c7 | c8 | c9 | c10 | c11 | c12 == -1:
+    if c1 | c2 | c3 | c4 | c5 | c6 | c7 | c8 | c9 | c10 | c11 == -1:
         print("Exception, there are at least one important column missing")
         sys.exit(1)
 
@@ -60,7 +59,6 @@ def load_data(spark, file):
     df = df.withColumn('DayofMonth', df['DayofMonth'].cast('string'))
     df = df.withColumn('DayOfWeek', df['DayOfWeek'].cast('string'))
     df = df.withColumn('CRSDepTime', df['CRSDepTime'].cast('integer'))
-    df = df.withColumn('CRSArrTime', df['CRSArrTime'].cast('integer'))
     df = df.withColumn('CRSElapsedTime', df['CRSElapsedTime'].cast('integer'))
     df = df.withColumn('DepDelay', df['DepDelay'].cast('integer'))
     df = df.withColumn('TaxiOut', df['TaxiOut'].cast('integer')) if 'TaxiOut' in df.columns else df
@@ -69,11 +67,10 @@ def load_data(spark, file):
     df = df.withColumn('Dest', df['Dest'].cast('string'))
     df = df.withColumn('ArrDelay', df['ArrDelay'].cast('integer'))
 
-    df.describe().show()
-
     # Remove rows with CRSElapsedTime (flight duration) less than 15 min and more than 15 hours
     df = df.filter((df['CRSElapsedTime'] >= 15) & (df['CRSElapsedTime'] <= 900))
 
+    # COLUMN TRANSFORMATIONS
     # Mean Taxi Out
     if 'TaxiOut' in df.columns:
         df_TaxiOutMean = df.groupby('Origin').agg(_mean('TaxiOut'))
@@ -83,9 +80,11 @@ def load_data(spark, file):
         df = df.drop(*('avg(TaxiOut)', 'Origin2'))
 
     # Reorder df, label -> numeric features -> nominal features
-    df = df.select('ArrDelay', 'CRSDepTime', 'CRSArrTime', 'CRSElapsedTime', 'DepDelay', 'TaxiOut', 'UniqueCarrier',
+    df = df.select('ArrDelay', 'CRSDepTime', 'CRSElapsedTime', 'DepDelay', 'TaxiOut', 'UniqueCarrier',
                    'Origin', 'Dest', 'Month', 'DayofMonth', 'DayOfWeek')
 
+    # Transform dataframe to another one with 2 columns: label (output) and features (all predictors combined in a
+    # vector). For categorical columns, OneHotCoding is applied
     formula = RFormula(
         formula="ArrDelay ~ .",
         featuresCol="features",
