@@ -31,7 +31,7 @@ def questions():
 
     while analize not in range(0, 2, 1):
         try:
-            analize = int(input("Would you like to perform some analysis? (0: No, 1: Yes):"))
+            analize = int(input("Would you like to perform some analysis? (0: No, 1: Yes): "))
         except:
             print('Not a valid number')
 
