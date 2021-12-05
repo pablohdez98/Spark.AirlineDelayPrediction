@@ -1,5 +1,5 @@
-from pyspark.ml.regression import LinearRegression
 from pyspark.ml.evaluation import RegressionEvaluator
+from pyspark.ml.regression import LinearRegression
 from pyspark.ml.regression import DecisionTreeRegressor
 
 
@@ -9,41 +9,26 @@ def split_data(df, trainRatio=0.8):
 
 def linear_regression_model(train):
     lr = LinearRegression(maxIter=10, regParam=0.3, elasticNetParam=0.8)
-    model = lr.fit(train)
-    print("Coefficients: %s" % str(model.coefficients))
-    print("Intercept: %s" % str(model.intercept))
-
-    trainingSummary = model.summary
-    print("numIterations: %d" % trainingSummary.totalIterations)
-    print("objectiveHistory: %s" % str(trainingSummary.objectiveHistory))
-    trainingSummary.residuals.show()
-    print("RMSE: %f" % trainingSummary.rootMeanSquaredError)
-    print("r2: %f" % trainingSummary.r2)
-    return model
+    return lr.fit(train)
 
 
-def evaluate_model(model, test):
-    pred_results = model.evaluate(test)
-    pred_results.predictions.sort('label', ascending=False).show()
-    print("MAE: %f" % pred_results.meanAbsoluteError)
-    print("MSE: %f" % pred_results.meanSquaredError)
-
-
-def decision_tree_model(trainingData):
-
-    # Create a DecisionTree model.
+def decision_tree_model(train):
     dt = DecisionTreeRegressor(featuresCol="features")
-    # Train model.
-    model = dt.fit(trainingData)
-    print(model)
-    return model
+    return dt.fit(train)
 
-def evalute_decisiontree_model(model, testData) :
-    # Make predictions.
-    predictions = model.transform(testData)
-    # Select example rows to display.
-    predictions.select("prediction", "label", "features").show(5)
-    # Select (prediction, true label) and compute test error
-    evaluator = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="rmse")
-    rmse = evaluator.evaluate(predictions)
+
+def evaluate_regression_model(model, test):
+    predictions = model.transform(test)
+
+    # Evaluate predictions with different metrics
+    rmse = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="rmse").evaluate(predictions)
+    r2 = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="r2").evaluate(predictions)
+    mae = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="mae").evaluate(predictions)
+    mse = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="mse").evaluate(predictions)
+
     print("Root Mean Squared Error (RMSE) on test data = %g" % rmse)
+    print("R2 on test data = %g" % r2)
+    print("Mean Absolute Error (MAE) on test data = %g" % mae)
+    print("Mean Squared Error (MSE) on test data = %g" % mse)
+
+    return predictions
