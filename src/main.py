@@ -1,40 +1,19 @@
 from pyspark.sql import SparkSession
+from user_input import questions
 from preprocessing import *
 from ml import *
 
-file_year = ml_algorithm = tunning_type = -1
-
-# User inputs
-while file_year not in range(1987, 2009, 1):
-    try:
-        file_year = int(input("Enter year of file (1987-2008): "))
-    except:
-        print('Not a valid year')
-
-while ml_algorithm not in range(1, 3, 1):
-    try:
-        ml_algorithm = int(input("Enter the number of the algorithm desired:"
-                                 "\n(1) Linear Regression"
-                                 "\n(2) Decision Tree"
-                                 "\n-> "))
-    except:
-        print('Not a valid algorithm')
-
-if ml_algorithm == 1:
-    while tunning_type not in range(1, 4, 1):
-        try:
-            tunning_type = int(input("Enter the number of how you want to run it:"
-                                     "\n(1) Default parameters"
-                                     "\n(2) Tunning by splitting the train into train and dev"
-                                     "\n(3) Tunning by applying cross-validation with k=5"
-                                     "\n-> "))
-        except:
-            print('Not a valid number')
+# Ask user for some configuration
+file_year, ml_algorithm, tunning_type, analize = questions()
 
 # Create Spark Session
 spark = SparkSession.builder.appName('Airline Delay Prediction').getOrCreate()
 
-df = load_data(spark, file_year)
+df = load_csv(spark, file_year)
+if analize:
+    analysis(df)
+df = process_data(df)
+
 train, test = split_data(df, 0.99)  # Split dataset in 2: train and test
 
 model = None

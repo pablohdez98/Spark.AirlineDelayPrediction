@@ -18,7 +18,7 @@ def linear_regression_model(train):
 
 def decision_tree_model(train):
     print("CREATING THE DECISION TREE MODEL...")
-    dt = DecisionTreeRegressor(featuresCol="features")
+    dt = DecisionTreeRegressor()
     return dt.fit(train)
 
 
