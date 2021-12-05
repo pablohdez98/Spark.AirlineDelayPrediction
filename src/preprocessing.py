@@ -24,6 +24,24 @@ def load_data(spark, file):
     # Remove useless variables
     df = df.drop(*('Year', 'CancellationCode', 'DepTime', 'FlightNum', 'TailNum', 'Distance', 'Cancelled'))
 
+    # Check if the columns remaining are in the file
+    c1 = df.schema.simpleString().find('Month')
+    c2 = df.schema.simpleString().find('DayofMonth')
+    c3 = df.schema.simpleString().find('DayOfWeek')
+    c4 = df.schema.simpleString().find('CRSDepTime')
+    c5 = df.schema.simpleString().find('CRSArrTime')
+    c6 = df.schema.simpleString().find('CRSElapsedTime')
+    c7 = df.schema.simpleString().find('DepDelay')
+    c8 = df.schema.simpleString().find('TaxiOut')
+    c9 = df.schema.simpleString().find('UniqueCarrier')
+    c10 = df.schema.simpleString().find('Origin')
+    c11 = df.schema.simpleString().find('Dest')
+    c12 = df.schema.simpleString().find('ArrDelay')
+
+    if c1 | c2 | c3 | c4 | c5 | c6 | c7 | c8 | c9 | c10 | c11 | c12 == -1:
+        print("Exception, there are at least one important column missing")
+        sys.exit(1)
+
     # Remove canceled flights
     df = df.replace('NA', None)
     df = df.na.drop(how='any', subset=['ArrDelay'])
