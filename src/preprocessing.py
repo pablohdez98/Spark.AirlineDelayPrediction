@@ -1,14 +1,17 @@
 import sys
 
+import pandas as pd
 from pyspark.ml.feature import RFormula, VectorAssembler, PCA
 from pyspark.ml.stat import Correlation
 from pyspark.sql.functions import mean as _mean
 from pyspark.sql.functions import isnan, when, count, col
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def load_csv(spark, file):
+    print("LOADING DATA...")
     # Check if file exists
     try:
         df = spark.read.csv('../data/' + str(file) + '.csv', header=True, inferSchema=True)
@@ -61,18 +64,30 @@ def load_csv(spark, file):
     df = df.replace('NA', None)
     df = df.na.drop(how='any', subset=['ArrDelay'])
 
+    # Check if columns have more than 50% empty values
+    df_nan = df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df.columns])
+    for c in df_nan.columns:
+        if (df.count() * 0.5) < df_nan.first()[c]:
+            df = df.drop(c)
+
     return df
 
 
 def analysis(df):
     print("PERFORMING ANALYSIS...")
+    if df.columns != 12:
+        print("Not all the columns are available for the analysis")
+        return
+    # Converting some columns into integer in order to analyse them
     df = df.withColumn('Month', df['Month'].cast('integer'))
     df = df.withColumn('DayofMonth', df['DayofMonth'].cast('integer'))
     df = df.withColumn('DayOfWeek', df['DayOfWeek'].cast('integer'))
 
+    # Drop categorical variables
     df = df.select(['Month', 'DayofMonth', 'DayOfWeek', 'DepTime', 'CRSDepTime', 'CRSArrTime', 'FlightNum',
                     'CRSElapsedTime', 'ArrDelay', 'DepDelay', 'Distance', 'TaxiOut'])
 
+    # Creating a column with all features contained in a vector
     assembler = VectorAssembler(inputCols=df.columns, outputCol='features')
     df_vector = assembler.transform(df).select('features')
 
@@ -89,24 +104,25 @@ def analysis(df):
     sns.lmplot(y='ArrDelay', x='DepDelay', data=s_df_pandas)
     plt.show()
 
+    # Remove high-correlated features
+    df = df.drop(*('DepTime', 'Distance', 'CRSArrTime'))
+    assembler = VectorAssembler(inputCols=df.columns, outputCol='features')
+    df_vector = assembler.transform(df).select('features')
+
     print("Calculating PCA...")
-    pca = PCA(k=5, inputCol="features", outputCol="PCA")
+    pca = PCA(k=9, inputCol="features", outputCol="PCA")
     model = pca.fit(df_vector)
 
-    result = model.transform(df_vector).select("PCA")
-    result.show(truncate=False)
+    pcs = np.round(model.pc.toArray(), 9)
+    df_pc = pd.DataFrame(pcs, columns=['PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC6', 'PC7', 'PC8', 'PC9'], index=df.columns)
+    print(df_pc)
 
 
 def process_data(df):
+    print("PROCESSING THE DATA...")
     # Remove useless variables
     df = df.drop(
-        *('Year', 'CancellationCode', 'DepTime', 'FlightNum', 'TailNum', 'Distance', 'Cancelled', 'CRSArrTime'))
-
-    # Check if columns have more than 50% empty values
-    df_nan = df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df.columns])
-    for c in df_nan.columns:
-        if (df.count() * 0.5) < df_nan.first()[c]:
-            df = df.drop(c)
+        *('Year', 'CancellationCode', 'DepTime', 'TailNum', 'Distance', 'Cancelled', 'CRSArrTime', 'Month', 'DayOfWeek'))
 
     # Remove rows with NA values
     df = df.na.drop(how='any')
@@ -124,8 +140,8 @@ def process_data(df):
         df = df.drop(*('avg(TaxiOut)', 'Origin2'))
 
     # Reorder df, label -> numeric features -> nominal features
-    df = df.select('ArrDelay', 'CRSDepTime', 'CRSElapsedTime', 'DepDelay', 'TaxiOut', 'UniqueCarrier',
-                   'Origin', 'Dest', 'Month', 'DayofMonth', 'DayOfWeek')
+    df = df.select('ArrDelay', 'CRSDepTime', 'CRSElapsedTime', 'DepDelay', 'TaxiOut', 'FlightNum', 'UniqueCarrier',
+                   'Origin', 'Dest', 'DayofMonth')
 
     # Transform dataframe to another one with 2 columns: label (output) and features (all predictors combined in a
     # vector). For categorical columns, OneHotCoding is applied
