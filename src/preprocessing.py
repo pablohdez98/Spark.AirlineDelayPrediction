@@ -48,7 +48,7 @@ def load_csv(spark, file):
     df = df.withColumn('CRSDepTime', df['CRSDepTime'].cast('integer'))
     df = df.withColumn('CRSArrTime', df['CRSArrTime'].cast('integer'))
     df = df.withColumn('UniqueCarrier', df['UniqueCarrier'].cast('string'))
-    df = df.withColumn('FlightNum', df['FlightNum'].cast('integer'))
+    df = df.withColumn('FlightNum', df['FlightNum'].cast('string'))
     df = df.withColumn('TailNum', df['TailNum'].cast('string'))
     df = df.withColumn('CRSElapsedTime', df['CRSElapsedTime'].cast('integer'))
     df = df.withColumn('ArrDelay', df['ArrDelay'].cast('integer'))
@@ -82,6 +82,7 @@ def analysis(df):
     df = df.withColumn('Month', df['Month'].cast('integer'))
     df = df.withColumn('DayofMonth', df['DayofMonth'].cast('integer'))
     df = df.withColumn('DayOfWeek', df['DayOfWeek'].cast('integer'))
+    df = df.withColumn('FlightNum', df['FlightNum'].cast('integer'))
 
     # Drop categorical variables
     df = df.select(['Month', 'DayofMonth', 'DayOfWeek', 'DepTime', 'CRSDepTime', 'CRSArrTime', 'FlightNum',
@@ -123,6 +124,8 @@ def process_data(df):
     # Remove useless variables
     df = df.drop(
         *('Year', 'CancellationCode', 'DepTime', 'TailNum', 'Distance', 'Cancelled', 'CRSArrTime', 'Month', 'DayOfWeek'))
+
+    print(df.columns)
 
     # Remove rows with NA values
     df = df.na.drop(how='any')
