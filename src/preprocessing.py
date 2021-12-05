@@ -5,10 +5,10 @@ from pyspark.sql.functions import mean as _mean
 from pyspark.sql.functions import isnan, when, count, col
 
 
-def load_data(spark):
+def load_data(spark, file):
     # Check if file exists
     try:
-        df = spark.read.csv('../data/2008.csv', header=True, inferSchema=True)
+        df = spark.read.csv('../data/'+str(file)+'.csv', header=True, inferSchema=True)
     except:
         print("Exception, file does not exist")
         sys.exit(1)
