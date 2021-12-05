@@ -1,6 +1,9 @@
+import sys
+
 from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.ml.regression import LinearRegression
 from pyspark.ml.regression import DecisionTreeRegressor
+from pyspark.ml.tuning import CrossValidator, ParamGridBuilder, TrainValidationSplit
 
 
 def split_data(df, trainRatio=0.8):
@@ -8,16 +11,48 @@ def split_data(df, trainRatio=0.8):
 
 
 def linear_regression_model(train):
-    lr = LinearRegression(maxIter=10, regParam=0.3, elasticNetParam=0.8)
+    print("CREATING THE LINEAR REGRESSION MODEL (DEFAULT PARAMETERS)...")
+    lr = LinearRegression()
     return lr.fit(train)
 
 
 def decision_tree_model(train):
+    print("CREATING THE DECISION TREE MODEL...")
     dt = DecisionTreeRegressor(featuresCol="features")
     return dt.fit(train)
 
 
+def ml_tunning(train, tunning_type):
+    print("CREATING THE LINEAR REGRESSION MODEL (" + tunning_type + ")...")
+    lr = LinearRegression(maxIter=10)
+    # Establising different parameters for the Linear Regression Model
+    paramGrid = ParamGridBuilder() \
+        .addGrid(lr.regParam, [0.3, 0.1, 0.01]) \
+        .addGrid(lr.fitIntercept, [False, True]) \
+        .addGrid(lr.elasticNetParam, [0.0, 0.5, 1.0]) \
+        .build()
+
+    model = None
+    if tunning_type == 'TRAIN VALIDATION SPLIT':
+        model = TrainValidationSplit(estimator=lr,
+                                     estimatorParamMaps=paramGrid,
+                                     evaluator=RegressionEvaluator(),
+                                     collectSubModels=True,
+                                     trainRatio=0.99)
+    elif tunning_type == 'CROSS-VALIDATION':
+        model = CrossValidator(estimator=lr,
+                               estimatorParamMaps=paramGrid,
+                               evaluator=RegressionEvaluator(),
+                               numFolds=5)
+
+    return model.fit(train)
+
+
 def evaluate_regression_model(model, test):
+    print("EVALUATING THE MODEL...")
+    if model is None:
+        print('Error, model could not be created')
+        sys.exit(1)
     predictions = model.transform(test)
 
     # Evaluate predictions with different metrics
