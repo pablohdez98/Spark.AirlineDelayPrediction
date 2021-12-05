@@ -1,21 +1,21 @@
 import sys
+
 from pyspark.ml.feature import RFormula
 from pyspark.sql.functions import mean as _mean
 from pyspark.sql.functions import isnan, when, count, col
 
 
 def load_data(spark):
-    # We prove that there is the file, and if there is one, we read it.
+    # Check if file exists
     try:
-        df = spark.read.csv('../data/2009.csv', header=True, inferSchema=True)
+        df = spark.read.csv('../data/2008.csv', header=True, inferSchema=True)
     except:
         print("Exception, file does not exist")
         sys.exit(1)
 
-    # We prove that the file is not empty
-    colnumber= df.count()
-    if(colnumber == 0):
-        print('Exception, the file is empty')
+    # Check if file is empty
+    if df.count() == 0:
+        print('Exception, file is empty')
         sys.exit(1)
 
     # Remove forbidden variables
